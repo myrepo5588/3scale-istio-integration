@@ -112,63 +112,6 @@ func TestAuthorizationCheck(t *testing.T) {
 			    ]
 			}`,
 		},
-		{
-			callWith: []integration.Call{
-				{
-					CallKind: integration.REPORT,
-					Attrs: map[string]interface{}{
-						"request.path":    "/thispath",
-						"request.method":  "get",
-						"request.api_key": "VALID",
-						"destination.labels": map[string]string{"service-mesh.3scale.net": "true"},
-					},
-				},
-			},
-			expect: `
-        {
-        "AdapterState": null,
-        "Returns": [
-         {
-          "Check": {
-           "Status": {},
-           "ValidDuration": 0,
-           "ValidUseCount": 0
-          },
-          "Quota": null,
-          "Error": null
-         }
-        ]
-        }`,
-		},
-		// // This test will fail due to something broken in the ISTIO integration tests...
-		// // with "Unable to unmarshal...Result: json: cannot unmarshal object into Go struct field Return.Error of type error"
-		//		{
-		//			callWith: []integration.Call{
-		//				{
-		//					CallKind: integration.REPORT,
-		//					Attrs: map[string]interface{}{
-		//						"request.path":    "/thispath",
-		//						"request.method":  "get",
-		//						"request.api_key": "INVALID",
-		//					},
-		//				},
-		//			},
-		//			expect: `{
-		//	"AdapterState": null,
-		//	"Returns": [{
-		//		"Check": {
-		//			"Status": {},
-		//			"ValidDuration": 0,
-		//			"ValidUseCount": 0
-		//		},
-		//		"Quota": null,
-		//		"Error": {
-		//			"code": 2,
-		//			"message": "1 error occurred:\n\t* rpc error: code = Unknown desc = report has not been successful\n\n"
-		//		}
-		//	}]
-		//}`,
-		//		},
 	}
 
 	for _, input := range inputs {
