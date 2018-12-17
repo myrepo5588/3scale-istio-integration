@@ -54,17 +54,30 @@ spec:
     monitored_resource_type: '"UNSPECIFIED"'
 ---
 
-# rule to dispatch to handler threescalehandler
+# rule to dispatch check to handler threescalehandler
 apiVersion: "config.istio.io/v1alpha2"
 kind: rule
 metadata:
-  name: threescale
+  name: threescale-authz
   namespace: istio-system
 spec:
-  match: destination.labels["service-mesh.3scale.net"] == "true"
+  match: destination.labels["service-mesh.3scale.net"] == "true" && context.reporter.kind == "inbound"
   actions:
-  - handler: threescale.handler.istio-system
-    instances:
-    - threescale-authorization
-    - threescale-logentry
+    - handler: threescale.handler.istio-system
+      instances:
+        - threescale-authorization
+---
+
+# rule to dispatch report to handler threescalehandler
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: threescale-report
+  namespace: istio-system
+spec:
+  match: destination.labels["service-mesh.3scale.net"] == "true" && context.reporter.kind == "outbound" && request.api_key != ""
+  actions:
+    - handler: threescale.handler.istio-system
+      instances:
+        - threescale-logentry
 ---
