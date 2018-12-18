@@ -117,6 +117,10 @@ func (s *Threescale) isAuthorized(cfg *config.Params, request authorization.Inst
 		return status.WithPermissionDenied("api_key required"), nil
 	}
 
+	if request.Action.Path == "" {
+		return status.WithInvalidArgument("missing request path"), nil
+	}
+
 	if s.conf.systemCache != nil {
 		pce, proxyConfErr = s.conf.systemCache.get(cfg, c)
 	} else {
@@ -131,50 +135,61 @@ func (s *Threescale) isAuthorized(cfg *config.Params, request authorization.Inst
 	return s.doAuthRep(cfg.ServiceId, userKey, request, pce.ProxyConfig)
 }
 
-func (s *Threescale) doAuthRep(svcID string, userKey string, request authorization.InstanceMsg, conf sysC.ProxyConfig) (rpc.Status, error) {
+func (s *Threescale) doAuthRep(svcID string, userKey string, request authorization.InstanceMsg, conf sysC.ProxyConfig) (rpcStatus rpc.Status, authRepErr error) {
 	const endpoint = "AuthRep"
 	const target = prometheus.Backend
-	var resp backendC.ApiResponse
-	var apiErr error
-
-	if request.Action.Path == "" {
-		return status.WithInvalidArgument("missing request path"), nil
-	}
+	var (
+		start   time.Time
+		elapsed time.Duration
+		metrics backendC.Metrics
+		params  backendC.AuthRepParams
+		resp    backendC.ApiResponse
+		auth    backendC.TokenAuth
+		apiErr  error
+	)
 
 	bc, err := s.backendClientBuilder(conf.Content.Proxy.Backend.Endpoint)
 	if err != nil {
-		return status.WithInvalidArgument(
-			fmt.Sprintf("error creating 3scale backend client - %s", err.Error())), err
+		rpcStatus = status.WithInvalidArgument(
+			fmt.Sprintf("error creating 3scale backend client - %s", err.Error()))
+		authRepErr = err
+		goto out
 	}
 
-	metrics := generateMetrics(request.Action.Path, request.Action.Method, conf)
+	metrics = generateMetrics(request.Action.Path, request.Action.Method, conf)
 	if len(metrics) == 0 {
-		return status.WithPermissionDenied(fmt.Sprintf("no matching mapping rule for request with method %s and path %s",
-			request.Action.Method, request.Action.Path)), nil
+		rpcStatus = status.WithPermissionDenied(fmt.Sprintf("no matching mapping rule for request with method %s and path %s",
+			request.Action.Method, request.Action.Path))
+		goto out
 	}
 
-	params := backendC.NewAuthRepParamsUserKey("", "", metrics, nil)
-
-	auth := backendC.TokenAuth{
+	params = backendC.NewAuthRepParamsUserKey("", "", metrics, nil)
+	auth = backendC.TokenAuth{
 		Type:  conf.Content.BackendAuthenticationType,
 		Value: conf.Content.BackendAuthenticationValue,
 	}
-	start := time.Now()
+
+	start = time.Now()
 	resp, apiErr = bc.AuthRepUserKey(auth, userKey, svcID, params)
-	elapsed := time.Since(start)
+	elapsed = time.Since(start)
 
 	go s.reportMetrics(svcID, prometheus.NewLatencyReport(endpoint, elapsed, conf.Content.Proxy.Backend.Endpoint, target),
 		prometheus.NewStatusReport(endpoint, resp.StatusCode, conf.Content.Proxy.Backend.Endpoint, target))
 
 	if apiErr != nil {
-		return status.WithMessage(2, fmt.Sprintf("error calling 3scale Auth -  %s", apiErr.Error())), apiErr
+		rpcStatus = status.WithMessage(2, fmt.Sprintf("error calling 3scale Auth -  %s", apiErr.Error()))
+		authRepErr = apiErr
+		goto out
 	}
 
 	if !resp.Success {
-		return status.WithPermissionDenied(resp.Reason), nil
+		rpcStatus = status.WithPermissionDenied(resp.Reason)
+		goto out
 	}
 
-	return status.OK, nil
+	goto out
+out:
+	return rpcStatus, authRepErr
 }
 
 // reportMetrics - report metrics for 3scale adapter to Prometheus. Function is safe to call if
