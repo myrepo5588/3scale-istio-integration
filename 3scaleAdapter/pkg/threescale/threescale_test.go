@@ -39,9 +39,9 @@ func TestHandleAuthorization(t *testing.T) {
 		{
 			name: "Test fail - invalid system url in CRD",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "www.invalid.com",
-				AccessToken:       "789",
+				ServiceId:   "123",
+				SystemUrl:   "www.invalid.com",
+				AccessToken: "789",
 			},
 			expectStatus: 3,
 			expectErrMsg: []string{"error building HTTP client for 3scale system", "invalid URI for request"},
@@ -49,56 +49,47 @@ func TestHandleAuthorization(t *testing.T) {
 		{
 			name: "Test fail - missing request path",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "789",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "789",
 			},
 			expectStatus: 3,
 			expectErrMsg: []string{"missing request path"},
 			template: authorization.InstanceMsg{
-				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "secret",
-				},
+				Name:   "",
 				Action: &authorization.ActionMsg{},
 			},
 		},
 		{
-			name: "Test fail - missing api_key",
+			name: "Test fail - missing user_key",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "789",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "789",
 			},
 			expectStatus: 7,
 			template: authorization.InstanceMsg{
 				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "",
-				},
 				Action: &authorization.ActionMsg{
 					Method: "get",
 					Path:   "/",
 				},
 			},
-			expectErrMsg: []string{"api_key required"},
+			expectErrMsg: []string{"user_key required"},
 		},
 		{
 			name: "Test fail - invalid or no response from 3scale backend",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "expect9",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "expect9",
 			},
 			expectStatus: 9,
 			template: authorization.InstanceMsg{
 				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "secret",
-				},
 				Action: &authorization.ActionMsg{
 					Method: "get",
-					Path:   "/test",
+					Path:   "/test?user_key=secret&test=curveball",
 				},
 			},
 			expectErrMsg: []string{"currently unable to fetch required data from 3scale system"},
@@ -106,20 +97,17 @@ func TestHandleAuthorization(t *testing.T) {
 		{
 			name: "Test fail - Non 2xx status code from 3scale backend",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "expect7",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "expect7",
 			},
 			expectStatus: 7,
 
 			template: authorization.InstanceMsg{
 				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "invalid-backend-resp",
-				},
 				Action: &authorization.ActionMsg{
 					Method: "get",
-					Path:   "/test",
+					Path:   "/test?user_key=invalid-backend-resp",
 				},
 			},
 			expectErrMsg: []string{"user_key_invalid"},
@@ -127,19 +115,16 @@ func TestHandleAuthorization(t *testing.T) {
 		{
 			name: "Test fail - non-matching mapping rule",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "any",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "any",
 			},
 			expectStatus: 7,
 			template: authorization.InstanceMsg{
 				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "secret",
-				},
 				Action: &authorization.ActionMsg{
 					Method: "post",
-					Path:   "/nop",
+					Path:   "/nop?user_key=secret",
 				},
 			},
 			expectErrMsg: []string{"no matching mapping rule for request with method post and path /nop"},
@@ -147,19 +132,16 @@ func TestHandleAuthorization(t *testing.T) {
 		{
 			name: "Test success - 200 response from Authorize call",
 			params: pb.Params{
-				ServiceId:         "123",
-				SystemUrl:         "https://www.fake-system.3scale.net",
-				AccessToken:       "happy-path",
+				ServiceId:   "123",
+				SystemUrl:   "https://www.fake-system.3scale.net",
+				AccessToken: "happy-path",
 			},
 			expectStatus: 0,
 			template: authorization.InstanceMsg{
 				Name: "",
-				Subject: &authorization.SubjectMsg{
-					User: "secret",
-				},
 				Action: &authorization.ActionMsg{
 					Method: "get",
-					Path:   "/",
+					Path:   "/?user_key=secret",
 				},
 			},
 		},
@@ -192,7 +174,7 @@ func TestHandleAuthorization(t *testing.T) {
 					return sysFake.GetProxyConfigLatestSuccess()
 				} else {
 
-					if input.template.Subject.User == "invalid-backend-resp" {
+					if strings.Contains(req.URL.RawQuery, "invalid-backend-resp") {
 						return &http.Response{
 							StatusCode: 403,
 							Body:       ioutil.NopCloser(bytes.NewBufferString(fake.GenInvalidUserKey("secret"))),
