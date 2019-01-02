@@ -5,7 +5,8 @@ An [out of process gRPC Adapter](https://github.com/istio/istio/wiki/Mixer-Out-O
 * [Overview](#overview)
 * [Prerequisites](#prerequisites)
 * [Deploy the adapter](#deploy-the-adapter)
-* [Customise and create the adapter configuration](#customise-and-create-the-adapter-configuration)
+* [Configuring the adapter](#configuring-the-adapter)
+* [Customise adapter manifests and create the resources](#customise-adapter-manifests-and-create-the-resources)
 * [Routing service traffic through the adapter](#routing-service-traffic-through-the-adapter)
 * [Authenticating requests](#authenticating-requests)
 * [Adapter metrics](#adapter-metrics)
@@ -33,7 +34,23 @@ To deploy the adapter to a Kubernetes/OpenShift cluster, within the `istio-syste
 oc create -f deploy/
 ```
 
-## Customise and create the adapter configuration
+## Configuring the adapter
+
+The runtime behaviour of the adapter can be modified by editing the deployment and setting or
+configuring the following environment variables:
+
+| Variable                         | Description                                                                                        | Default |
+|----------------------------------|----------------------------------------------------------------------------------------------------|---------|
+| THREESCALE_LISTEN_ADDR           | Sets the listen address for the gRPC server                                                        | 0       |
+| THREESCALE_LOG_LEVEL             | Sets the minimum log output level. Accepted values are one of `debug`,`info`,`warn`,`error`,`none` | info    |
+| THREESCALE_LOG_JSON              | Controls whether the log is formatted as JSON                                                      | true    |
+| THREESCALE_REPORT_METRICS        | Controls whether 3scale system and backend metrics are collected and reported to Prometheus        | true    |
+| THREESCALE_METRICS_PORT          | Sets the port which 3scale `/metrics` endpoint can be scrapped from                                | 8080    |
+| THREESCALE_CACHE_TTL_SECONDS     | Time period, in seconds, to wait before purging expired items from the cache                       | 300     |
+| THREESCALE_CACHE_REFRESH_SECONDS | Time period before expiry, when cache elements are attempted to be refreshed                       | 180     |
+| THREESCALE_CACHE_ENTRIES_MAX     | Max number of items that can be stored in the cache at any time                                    | 1000    |
+
+## Customise adapter manifests and create the resources
 
 The required CustomResources are located in the `istio` directory. These samples can be used
 to configure requests to your services via 3scale.
